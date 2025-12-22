@@ -1,5 +1,7 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Load the Universal UI Library
+local UniversalUI = loadstring(game:HttpGet("https://scriptblox.com/script/Universal-Script-ui-library-15556"))()
 
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -7,23 +9,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({
-    Name = "Grizz Hub",
-    LoadingTitle = "Grizz Hub Loading",
-    LoadingSubtitle = "99 Nights in the Forest",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "GrizzHub",
-        FileName = "99NightsConfig"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "",
-        RememberJoins = true
-    },
-    KeySystem = false,
-})
-
+-- Variables
 local teleportTargets = {
     "Alien", "Alien Chest", "Alien Shelf", "Alpha Wolf", "Alpha Wolf Pelt", "Anvil Base", "Apple", "Bandage", "Bear", "Berry",
     "Bolt", "Broken Fan", "Broken Microwave", "Bunny", "Bunny Foot", "Cake", "Carrot", "Chair Set", "Chest", "Chilli",
@@ -40,22 +26,21 @@ local ignoreDistanceFrom = Vector3.new(0, 0, 0)
 local minDistance = 50
 local AutoTreeFarmEnabled = false
 
+-- Create the UI Window
+local Window = UniversalUI.new({
+    Title = "Grizz Hub",
+    SubTitle = "99 Nights in the Forest",
+    Tabs = {"Home", "Teleport", "Player", "Auto Farm", "Kill Aura", "Item ESP", "Mob ESP", "Visuals", "Misc"}
+})
+
+-- Virtual input
 local VirtualInputManager = game:GetService("VirtualInputManager")
 function mouse1click()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 end
 
-local AimbotEnabled = false
-local FOVRadius = 100
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(128, 255, 0)
-FOVCircle.Thickness = 1
-FOVCircle.Radius = FOVRadius
-FOVCircle.Transparency = 0.5
-FOVCircle.Filled = false
-FOVCircle.Visible = false
-
+-- Safe Zone
 local safezoneBaseplates = {}
 local baseplateSize = Vector3.new(2048, 1, 2048)
 for dx = -1, 1 do
@@ -74,6 +59,7 @@ for dx = -1, 1 do
     end
 end
 
+-- ESP Functions
 local function createESP(item)
     local adorneePart
     if item:IsA("Model") then
@@ -133,6 +119,7 @@ local function toggleESP(state)
     end
 end
 
+-- NPC ESP
 local npcBoxes = {}
 local function createNPCESP(npc)
     if not npc:IsA("Model") or npc:FindFirstChild("HumanoidRootPart") == nil then return end
@@ -182,52 +169,66 @@ local function toggleNPCESP(state)
     end
 end
 
-local badTrees = {}
-task.spawn(function()
-    while true do
-        if AutoTreeFarmEnabled then
-            local trees = {}
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj.Name == "Trunk" and obj.Parent and obj.Parent.Name == "Small Tree" then
-                    local distance = (obj.Position - ignoreDistanceFrom).Magnitude
-                    if distance > minDistance and not badTrees[obj:GetFullName()] then
-                        table.insert(trees, obj)
-                    end
-                end
-            end
+-- Home Tab
+local Home = Window.Tabs.Home
 
-            table.sort(trees, function(a, b)
-                return (a.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude <
-                       (b.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-            end)
-
-            for _, trunk in ipairs(trees) do
-                if not AutoTreeFarmEnabled then break end
-                LocalPlayer.Character:PivotTo(trunk.CFrame + Vector3.new(0, 3, 0))
-                task.wait(0.2)
-                local startTime = tick()
-                while AutoTreeFarmEnabled and trunk and trunk.Parent and trunk.Parent.Name == "Small Tree" do
-                    mouse1click()
-                    task.wait(0.2)
-                    if tick() - startTime > 12 then
-                        badTrees[trunk:GetFullName()] = true
-                        break
-                    end
-                end
-                task.wait(0.3)
-            end
-        end
-        task.wait(1.5)
+Home:AddButton({
+    Title = "Teleport to Campfire",
+    Callback = function()
+        LocalPlayer.Character:PivotTo(CFrame.new(0, 10, 0))
     end
-end)
+})
 
-local lastAimbotCheck = 0
-local aimbotCheckInterval = 0.02
-local smoothness = 0.2
+Home:AddButton({
+    Title = "Teleport to Grinder",
+    Callback = function()
+        LocalPlayer.Character:PivotTo(CFrame.new(16.1,4,-4.6))
+    end
+})
 
+Home:AddToggle({
+    Title = "Item ESP",
+    Callback = function(state)
+        toggleESP(state)
+    end
+})
+
+Home:AddToggle({
+    Title = "NPC ESP",
+    Callback = function(state)
+        toggleNPCESP(state)
+    end
+})
+
+Home:AddToggle({
+    Title = "Auto Tree Farm",
+    Callback = function(state)
+        AutoTreeFarmEnabled = state
+    end
+})
+
+Home:AddToggle({
+    Title = "Show Safe Zone",
+    Callback = function(state)
+        for _, baseplate in ipairs(safezoneBaseplates) do
+            baseplate.Transparency = state and 0.8 or 1
+            baseplate.CanCollide = state
+        end
+    end
+})
+
+-- Aimbot
+local AimbotEnabled = false
+Home:AddToggle({
+    Title = "Aimbot (Right Click)",
+    Callback = function(state)
+        AimbotEnabled = state
+    end
+})
+
+-- Fly
 local flying, flyConnection = false, nil
 local speed = 60
-
 local function startFlying()
     local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
@@ -263,187 +264,20 @@ local function stopFlying()
     end
 end
 
-local function toggleFly(state)
-    flying = state
-    if flying then startFlying() else stopFlying() end
-end
-
-RunService.RenderStepped:Connect(function()
-    if FOVCircle then
-        local mousePos = UserInputService:GetMouseLocation()
-        FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
-    end
-end)
-
-workspace.DescendantAdded:Connect(function(desc)
-    if espEnabled and table.find(teleportTargets, desc.Name) then
-        task.wait(0.1)
-        createESP(desc)
-    end
-    if table.find(AimbotTargets, desc.Name) and desc:IsA("Model") then
-        task.wait(0.1)
-        if npcESPEnabled then createNPCESP(desc) end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    for npc, visuals in pairs(npcBoxes) do
-        local box = visuals.box
-        local name = visuals.name
-
-        if npc and npc:FindFirstChild("HumanoidRootPart") then
-            local hrp = npc.HumanoidRootPart
-            local size = Vector2.new(60, 80)
-            local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-
-            if onScreen then
-                box.Position = Vector2.new(screenPos.X - size.X / 2, screenPos.Y - size.Y / 2)
-                box.Size = size
-                box.Visible = true
-
-                name.Position = Vector2.new(screenPos.X, screenPos.Y - size.Y / 2 - 15)
-                name.Visible = true
-            else
-                box.Visible = false
-                name.Visible = false
-            end
-        else
-            box:Remove()
-            name:Remove()
-            npcBoxes[npc] = nil
-        end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if not AimbotEnabled or not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        return
-    end
-
-    local currentTime = tick()
-    if currentTime - lastAimbotCheck < aimbotCheckInterval then return end
-    lastAimbotCheck = currentTime
-
-    local mousePos = UserInputService:GetMouseLocation()
-    local closestTarget, shortestDistance = nil, math.huge
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if table.find(AimbotTargets, obj.Name) and obj:IsA("Model") then
-            local head = obj:FindFirstChild("Head")
-            if head then
-                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < shortestDistance and dist <= FOVRadius then
-                        shortestDistance = dist
-                        closestTarget = head
-                    end
-                end
-            end
-        end
-    end
-
-    if closestTarget then
-        local currentCF = camera.CFrame
-        local targetCF = CFrame.new(camera.CFrame.Position, closestTarget.Position)
-        camera.CFrame = currentCF:Lerp(targetCF, smoothness)
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Q then
-        toggleFly(not flying)
-    end
-end)
-
-local HomeTab = Window:CreateTab("🏠Home🏠", 4483362458)
-
-HomeTab:CreateButton({
-    Name = "Teleport to Campfire",
-    Callback = function()
-        LocalPlayer.Character:PivotTo(CFrame.new(0, 10, 0))
+Home:AddToggle({
+    Title = "Fly (WASD + Space + Shift)",
+    Callback = function(state)
+        flying = state
+        if flying then startFlying() else stopFlying() end
     end
 })
 
-HomeTab:CreateButton({
-    Name = "Teleport to Grinder",
-    Callback = function()
-        LocalPlayer.Character:PivotTo(CFrame.new(16.1,4,-4.6))
-    end
-})
+-- Teleport Tab
+local Teleport = Window.Tabs.Teleport
 
-HomeTab:CreateToggle({
-    Name = "Item ESP",
-    CurrentValue = false,
-    Callback = toggleESP
-})
-
-HomeTab:CreateToggle({
-    Name = "NPC ESP",
-    CurrentValue = false,
-    Callback = function(value)
-        toggleNPCESP(value)
-        Rayfield:Notify({
-            Title = "NPC ESP",
-            Content = value and "NPC ESP Enabled" or "NPC ESP Disabled",
-            Duration = 4,
-            Image = 4483362458,
-        })
-    end
-})
-
-HomeTab:CreateToggle({
-    Name = "Auto Tree Farm (Small Tree)",
-    CurrentValue = false,
-    Callback = function(value)
-        AutoTreeFarmEnabled = value
-    end
-})
-
-HomeTab:CreateToggle({
-    Name = "Aimbot (Right Click)",
-    CurrentValue = false,
-    Callback = function(value)
-        AimbotEnabled = value
-        Rayfield:Notify({
-            Title = "Aimbot",
-            Content = value and "Enabled - Hold Right Click to aim." or "Disabled.",
-            Duration = 4,
-            Image = 4483362458,
-        })
-    end
-})
-
-HomeTab:CreateToggle({
-    Name = "Fly (WASD + Space + Shift)",
-    CurrentValue = false,
-    Callback = function(value)
-        toggleFly(value)
-        Rayfield:Notify({
-            Title = "Fly",
-            Content = value and "Fly Enabled" or "Fly Disabled",
-            Duration = 4,
-            Image = 4483362458,
-        })
-    end
-})
-
-HomeTab:CreateToggle({
-    Name = "Show Safe Zone",
-    CurrentValue = false,
-    Callback = function(value)
-        for _, baseplate in ipairs(safezoneBaseplates) do
-            baseplate.Transparency = value and 0.8 or 1
-            baseplate.CanCollide = value
-        end
-    end
-})
-
-local TeleTab = Window:CreateTab("🧲Teleport🧲", 4483362458)
 for _, itemName in ipairs(teleportTargets) do
-    TeleTab:CreateButton({
-        Name = "Teleport to " .. itemName,
+    Teleport:AddButton({
+        Title = "TP to " .. itemName,
         Callback = function()
             local closest, shortest = nil, math.huge
             for _, obj in pairs(workspace:GetDescendants()) do
@@ -472,35 +306,20 @@ for _, itemName in ipairs(teleportTargets) do
                 end
                 if cf then
                     LocalPlayer.Character:PivotTo(cf + Vector3.new(0, 5, 0))
-                else
-                    Rayfield:Notify({
-                        Title = "Teleport Failed",
-                        Content = "Could not find a valid position to teleport.",
-                        Duration = 5,
-                        Image = 4483362458,
-                    })
                 end
-            else
-                Rayfield:Notify({
-                    Title = "Item Not Found",
-                    Content = itemName .. " not found or too close to origin.",
-                    Duration = 5,
-                    Image = 4483362458,
-                })
             end
         end
     })
 end
 
-local PlayerTab = Window:CreateTab("👤Player👤", 4483362458)
+-- Player Tab
+local Player = Window.Tabs.Player
 
-PlayerTab:CreateSlider({
-    Name = "WalkSpeed",
-    Range = {16, 300},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = 16,
-    Flag = "WalkSpeed",
+Player:AddSlider({
+    Title = "WalkSpeed",
+    Min = 16,
+    Max = 300,
+    Default = 16,
     Callback = function(value)
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -509,13 +328,11 @@ PlayerTab:CreateSlider({
     end
 })
 
-PlayerTab:CreateSlider({
-    Name = "JumpPower",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "studs",
-    CurrentValue = 50,
-    Flag = "JumpPower",
+Player:AddSlider({
+    Title = "JumpPower",
+    Min = 50,
+    Max = 500,
+    Default = 50,
     Callback = function(value)
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -524,145 +341,140 @@ PlayerTab:CreateSlider({
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "Speed Hack (50)",
-    CurrentValue = false,
-    Callback = function(value)
+Player:AddToggle({
+    Title = "Speed Hack (50)",
+    Callback = function(state)
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = value and 50 or 16
+            char.Humanoid.WalkSpeed = state and 50 or 16
         end
     end
 })
 
-local AutoTab = Window:CreateTab("⚡Auto Farm⚡", 4483362458)
+-- Auto Farm Tab
+local AutoFarm = Window.Tabs["Auto Farm"]
 
-AutoTab:CreateToggle({
-    Name = "Auto Feed Campfire",
-    CurrentValue = false,
-    Callback = function(value)
+AutoFarm:AddToggle({
+    Title = "Auto Feed Campfire",
+    Callback = function(state)
     end
 })
 
-AutoTab:CreateToggle({
-    Name = "Auto Cook Food",
-    CurrentValue = false,
-    Callback = function(value)
+AutoFarm:AddToggle({
+    Title = "Auto Cook Food",
+    Callback = function(state)
     end
 })
 
-AutoTab:CreateToggle({
-    Name = "Auto Grind Machine",
-    CurrentValue = false,
-    Callback = function(value)
+AutoFarm:AddToggle({
+    Title = "Auto Grind Machine",
+    Callback = function(state)
     end
 })
 
-AutoTab:CreateToggle({
-    Name = "Auto Eat Food",
-    CurrentValue = false,
-    Callback = function(value)
+AutoFarm:AddToggle({
+    Title = "Auto Eat Food",
+    Callback = function(state)
     end
 })
 
-AutoTab:CreateToggle({
-    Name = "Auto Biofuel",
-    CurrentValue = false,
-    Callback = function(value)
+AutoFarm:AddToggle({
+    Title = "Auto Biofuel",
+    Callback = function(state)
     end
 })
 
-local KillAuraTab = Window:CreateTab("⚔️Kill Aura⚔️", 4483362458)
+-- Kill Aura Tab
+local KillAura = Window.Tabs["Kill Aura"]
 
 local killAuraEnabled = false
-KillAuraTab:CreateToggle({
-    Name = "Kill Aura",
-    CurrentValue = false,
-    Callback = function(value)
-        killAuraEnabled = value
+KillAura:AddToggle({
+    Title = "Kill Aura",
+    Callback = function(state)
+        killAuraEnabled = state
     end
 })
 
-KillAuraTab:CreateSlider({
-    Name = "Kill Aura Radius",
-    Range = {20, 200},
-    Increment = 5,
-    Suffix = "studs",
-    CurrentValue = 50,
-    Flag = "KillAuraRadius",
+KillAura:AddSlider({
+    Title = "Kill Aura Radius",
+    Min = 20,
+    Max = 200,
+    Default = 50,
     Callback = function(value)
     end
 })
 
-local ItemTab = Window:CreateTab("📦Item ESP📦", 4483362458)
+-- Item ESP Tab
+local ItemESP = Window.Tabs["Item ESP"]
 
-ItemTab:CreateToggle({
-    Name = "Advanced Item ESP",
-    CurrentValue = false,
-    Callback = function(value)
+ItemESP:AddToggle({
+    Title = "Advanced Item ESP",
+    Callback = function(state)
     end
 })
 
-ItemTab:CreateDropdown({
-    Name = "Teleport Item to You",
+ItemESP:AddDropdown({
+    Title = "Teleport Item to You",
     Options = teleportTargets,
-    CurrentOption = "",
-    Flag = "TeleportItemToYou",
     Callback = function(option)
     end
 })
 
-local MobTab = Window:CreateTab("👹Mob ESP👹", 4483362458)
+-- Mob ESP Tab
+local MobESP = Window.Tabs["Mob ESP"]
 
-MobTab:CreateToggle({
-    Name = "Mob Highlighter",
-    CurrentValue = false,
-    Callback = function(value)
+MobESP:AddToggle({
+    Title = "Mob Highlighter",
+    Callback = function(state)
     end
 })
 
-MobTab:CreateDropdown({
-    Name = "Teleport Mob to You",
+MobESP:AddDropdown({
+    Title = "Teleport Mob to You",
     Options = AimbotTargets,
-    CurrentOption = "",
-    Flag = "TeleportMobToYou",
     Callback = function(option)
     end
 })
 
-local VisualsTab = Window:CreateTab("👁️Visuals👁️", 4483362458)
+-- Visuals Tab
+local Visuals = Window.Tabs.Visuals
 
-VisualsTab:CreateToggle({
-    Name = "Player ESP",
-    CurrentValue = false,
-    Callback = function(value)
+Visuals:AddToggle({
+    Title = "Player ESP",
+    Callback = function(state)
     end
 })
 
-VisualsTab:CreateToggle({
-    Name = "Player Chams",
-    CurrentValue = false,
-    Callback = function(value)
+Visuals:AddToggle({
+    Title = "Player Chams",
+    Callback = function(state)
     end
 })
 
-VisualsTab:CreateToggle({
-    Name = "FOV Circle",
-    CurrentValue = false,
-    Callback = function(value)
+-- FOV Circle
+local FOVRadius = 100
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(128, 255, 0)
+FOVCircle.Thickness = 1
+FOVCircle.Radius = FOVRadius
+FOVCircle.Transparency = 0.5
+FOVCircle.Filled = false
+FOVCircle.Visible = false
+
+Visuals:AddToggle({
+    Title = "FOV Circle",
+    Callback = function(state)
         if FOVCircle then
-            FOVCircle.Visible = value
+            FOVCircle.Visible = state
         end
     end
 })
 
-VisualsTab:CreateSlider({
-    Name = "FOV Circle Radius",
-    Range = {50, 300},
-    Increment = 10,
-    Suffix = "pixels",
-    CurrentValue = 100,
-    Flag = "FOVRadius",
+Visuals:AddSlider({
+    Title = "FOV Circle Radius",
+    Min = 50,
+    Max = 300,
+    Default = 100,
     Callback = function(value)
         FOVRadius = value
         if FOVCircle then
@@ -671,13 +483,12 @@ VisualsTab:CreateSlider({
     end
 })
 
-local MiscTab = Window:CreateTab("🔧Misc🔧", 4483362458)
+-- Misc Tab
+local Misc = Window.Tabs.Misc
 
-MiscTab:CreateDropdown({
-    Name = "Extra Scripts",
+Misc:AddDropdown({
+    Title = "Extra Scripts",
     Options = {"Infinite Yield", "Emote GUI", "Turtle Spy", "Anti AFK"},
-    CurrentOption = "",
-    Flag = "ExtraScripts",
     Callback = function(option)
         if option == "Infinite Yield" then
             loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
@@ -695,31 +506,27 @@ MiscTab:CreateDropdown({
     end
 })
 
-MiscTab:CreateButton({
-    Name = "Teleport to Stronghold",
+Misc:AddButton({
+    Title = "Teleport to Stronghold",
     Callback = function()
         LocalPlayer.Character:PivotTo(CFrame.new(100, 50, 100))
     end
 })
 
-MiscTab:CreateButton({
-    Name = "Teleport to Diamond Chest",
+Misc:AddButton({
+    Title = "Teleport to Diamond Chest",
     Callback = function()
         LocalPlayer.Character:PivotTo(CFrame.new(120, 50, 100))
     end
 })
 
-MiscTab:CreateToggle({
-    Name = "Auto Stronghold Timer",
-    CurrentValue = false,
-    Callback = function(value)
+Misc:AddToggle({
+    Title = "Auto Stronghold Timer",
+    Callback = function(state)
     end
 })
 
-Rayfield:LoadConfiguration()
-Rayfield:Notify({
-    Title = "Grizz Hub Loaded",
-    Content = "99 Nights in the Forest script activated!",
-    Duration = 6,
-    Image = 4483362458,
-})
+-- Initialize the UI
+Window:Init()
+
+print("Grizz Hub loaded successfully!")
